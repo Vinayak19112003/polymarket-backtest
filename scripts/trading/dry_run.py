@@ -14,7 +14,7 @@ import threading
 from datetime import datetime
 
 # Add project root
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.bot.price_feed import BinancePriceFeed
 from src.bot.features import RealtimeFeatureEngine

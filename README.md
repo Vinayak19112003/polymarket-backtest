@@ -1,92 +1,53 @@
-# Polymarket Trading Bot (V2 Enhanced)
+# Polymarket Trading Bot V2 (Enhanced)
 
-A professional-grade, institutional-quality algorithmic trading bot for Polymarket (and other CLOBs). 
-Refactored for **100% Logic Parity** between Backtesting and Live Trading.
+⚠️ **IMPORTANT: This is V2 Enhanced - DO NOT mix with V1 (archived)**
 
-![Python](https://img.shields.io/badge/Python-3.11-blue) ![ROI](https://img.shields.io/badge/Backtest%20ROI-77k%25-green) ![Status](https://img.shields.io/badge/Status-Production%20Ready-success)
+## 🚀 Quick Start (V2 Production)
 
-## 🚀 Key Features (V2)
-- **Unified Strategy Engine**: `src/features/strategy.py` is the single source of truth for both Backtesting and Live Execution.
-- **Advanced Filters**:
-  - **Volatility Regime**: Auto-shutdown during high-risk choppy markets (ATR > 0.8%).
-  - **Time-of-Day**: Avoiding illiquid Asian sessions (02:00-05:00 UTC).
-  - **Multi-Timeframe**: 1H Trend Confirmation for 15m entries.
-  - **ML Hybrid**: Optional XGBoost signal confirmation.
-- **Robust Infrastructure**:
-  - **Dockerized**: One-command deployment via `docker-compose up`.
-  - **Database**: SQLite/Postgres persistence for trades.
-  - **Dashboard**: Real-time Streamlit analytics.
-
-## 📂 Project Structure
-```
-polymarket-ml/
-├── src/
-│   ├── bot/                 # Live Trading Logic
-│   │   ├── main.py          # Entry Point
-│   │   ├── features.py      # Feature Engineering (V2)
-│   │   └── market.py        # CLOB Execution
-│   ├── features/
-│   │   └── strategy.py      # UNIFIED STRATEGY LOGIC (The Brain)
-│   └── infrastructure/      # Database & Persistence
-├── scripts/
-│   ├── backtest_enhanced_v2.py  # Primary Backtest (Vol+MTF+TOD)
-│   ├── dry_run.py               # Paper Trading Simulator
-│   ├── dashboard.py             # Streamlit Analytics
-│   └── train_model.py           # ML Model Pipeline
-├── tests/                   # Pytest Suite (15/15 Passed)
-├── Dockerfile               # Container Config
-└── docker-compose.yml       # Orchestration
-```
-
-## 🛠️ Installation & Usage
-
-### 1. Setup
+### Paper Trading (Recommended First Step)
 ```bash
-git clone https://github.com/Vinayak19112003/polymarket-backtest.git
-cd polymarket-backtest
-pip install -r requirements.txt
-python scripts/setup_secrets.py  # Configures .env safely
+python scripts/trading/dry_run.py
 ```
 
-### 2. Live Trading (Real Money)
+### Live Trading (After Paper Trading Success)
 ```bash
-# Ensure LIVE_TRADING=true in .env
 python src/bot/main.py
 ```
 
-### 3. Dry Run / Paper Trading
+### Backtesting V2
 ```bash
-python scripts/dry_run.py
+python scripts/backtest/backtest_enhanced_v2.py
 ```
 
-### 4. Backtesting
-```bash
-# Run the Enhanced V2 Backtest
-python scripts/backtest_enhanced_v2.py
+## 📂 Directory Structure
+- `src/` - Production V2 code (SINGLE SOURCE OF TRUTH)
+- `scripts/backtest/` - V2 backtesting & analysis
+- `scripts/trading/` - Paper trading & live tools
+- `archive/v1_baseline/` - Legacy V1 (REFERENCE ONLY)
 
-# Run Walk-Forward Validation
-python scripts/walk_forward_validation.py
+## 📊 V2 Performance (Validated)
+- **Win Rate:** 58.01%
+- **ROI (2Y):** 777% (non-compounding)
+- **With 1% Slippage:** $637 PnL (ROBUST)
+- **Risk of Ruin:** 0.0%
+- **Stability (CV):** 0.79 (Excellent)
 
-# Run Monte Carlo Risk Analysis
-python scripts/monte_carlo_simulation.py
-```
+## ⚠️ Version Warnings
+- ❌ DO NOT use files from `archive/v1_baseline/`
+- ❌ DO NOT mix V1 and V2 strategy logic
+- ✅ ONLY use `src/features/strategy.py` for trading decisions
+- ✅ ONLY use `scripts/backtest/backtest_enhanced_v2.py` for V2 validation
 
-### 5. Dashboard
-```bash
-python -m streamlit run scripts/dashboard.py
-```
+## 🗺️ Roadmap
+- [x] V1 Baseline strategy (Archived)
+- [x] V2 Enhanced with filters
+- [x] Comprehensive backtesting
+- [x] Slippage sensitivity validation
+- [ ] Paper trading (7 days) ← **YOU ARE HERE**
+- [ ] Live trading ($50-100)
+- [ ] Scale to full capital
 
-### 6. Deployment (Docker)
-```bash
-docker-compose up -d --build
-```
-
-## 📊 Performance (2-Year Backtest)
-- **Win Rate**: 58.01%
-- **Trades**: 12,921
-- **ROI**: +77,708%
-- **Sharpe Ratio**: 2.8 (Est)
-- **Risk of Ruin**: 0.00% (Monte Carlo)
-
-## ⚖️ License
-MIT License.
+---
+**Current Version:** V2 Enhanced (Production Ready)
+**Status:** Cleared for Paper Trading
+**Last Validation:** 2026-02-06

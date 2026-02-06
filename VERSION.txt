@@ -1,0 +1,16 @@
+CURRENT VERSION: V2 Enhanced (Production)
+
+V2 Features:
+- Volatility regime filter (ATR-based)
+- Time-of-day filter (blocks 02:00-05:00 UTC)
+- 1H trend confirmation
+- ML hybrid (optional XGBoost)
+- Win Rate: 58.01%
+- Slippage-tested: ROBUST
+
+IMPORTANT:
+- V1 files are in archive/v1_baseline/ (DO NOT USE)
+- All production code uses V2 strategy from src/features/strategy.py
+- All live trading uses src/bot/main.py
+
+Last Updated: 2026-02-06
