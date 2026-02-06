@@ -7,7 +7,7 @@ import numpy as np
 # Constants
 ENTRY_PRICE = 0.50
 FEES = 0.02
-DATA_FILE = "data/backtest_btc_2y.csv"
+DATA_FILE = "data/btcusdt_1m.csv"
 
 def run_simulation():
     if not os.path.exists(DATA_FILE):
@@ -49,32 +49,31 @@ def run_simulation():
     # Dist < 0 means Prev Close < Prev EMA (Downtrend)
     df_15m['dist_ema'] = (df_15m['prev_close'] / df_15m['prev_ema']) - 1
     
-    # Thresholds
-    # Default
-    threshold_buy = 43
-    threshold_sell = 58
+    # Signal Logic (Unified Strategy Import)
+    try:
+        from src.features.strategy import check_mean_reversion_signal
+    except ImportError:
+        # Allow running from scripts/ dir
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from src.features.strategy import check_mean_reversion_signal
+        
+    print("Applying Unified Strategy Logic (Row-wise)...")
     
-    # Dynamic
-    # If Downtrend (dist < 0), Stricter Buy (38)
-    # If Uptrend (dist > 0), Stricter Sell (62)
-    
-    conditions = [
-        (df_15m['dist_ema'] < 0), # Downtrend
-        (df_15m['dist_ema'] > 0)  # Uptrend
-    ]
-    choices_buy = [38, 43]
-    choices_sell = [58, 62]
-    
-    df_15m['thresh_buy'] = np.select(conditions, choices_buy, default=43)
-    df_15m['thresh_sell'] = np.select(conditions, choices_sell, default=58)
-    
-    # Generate Signals
-    # BUY YES if RSI < Buy Thresh
-    # BUY NO if RSI > Sell Thresh
-    
-    df_15m['signal'] = 'NONE'
-    df_15m.loc[df_15m['prev_rsi'] < df_15m['thresh_buy'], 'signal'] = 'YES'
-    df_15m.loc[df_15m['prev_rsi'] > df_15m['thresh_sell'], 'signal'] = 'NO'
+    # Helper for apply
+    def apply_signal(row):
+        # We use PREVIOUS candle's features to decide at OPEN
+        rsi = row['prev_rsi']
+        dist = row['dist_ema']
+        
+        # Handle NaN
+        if pd.isna(rsi) or pd.isna(dist):
+            return 'NONE'
+            
+        signal, _ = check_mean_reversion_signal(rsi, dist)
+        return signal if signal else 'NONE'
+        
+    # Apply row-wise (slower but guarantees exact parity with live bot)
+    df_15m['signal'] = df_15m.apply(apply_signal, axis=1)
     
     # Filter only trades
     trades = df_15m[df_15m['signal'] != 'NONE'].copy()

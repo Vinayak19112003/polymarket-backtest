@@ -85,7 +85,7 @@ class RealPolymarketPaperTrader:
         # Components
         self.orderbook_poller = CLOBOrderbookPoller()
         self.price_feed = BinancePriceFeed(symbol='BTCUSDT')
-        self.price_feed.register_callback(self.on_candle_close)
+        # Removed duplicate callback registration (Done in start())
         self.feature_engine = FeatureEngine()
         
         # State

@@ -1,0 +1,28 @@
+
+version: '3.8'
+
+services:
+  polymarket_bot:
+    build: .
+    container_name: polymarket_bot
+    restart: unless-stopped
+    volumes:
+      - ./.env:/app/.env
+      - ./logs:/app/logs
+      - ./results:/app/results
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: python src/bot/main.py
+
+  # Dashboard Service (Phase 7)
+  dashboard:
+    build: .
+    container_name: polymarket_dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./.env:/app/.env
+      - ./logs:/app/logs
+      - ./results:/app/results
+    command: streamlit run scripts/dashboard.py

@@ -41,20 +41,22 @@ if os.path.exists(env_path):
                         ORDER_TIMEOUT_SECONDS = int(value)
                     elif key == 'PRICE_OFFSET_USD':
                         PRICE_OFFSET_USD = float(value)
-                except:
+                    
+                    # Fix: Env Vars (Moved inside try block)
+                    elif key == 'PRIVATE_KEY':
+                        os.environ['PRIVATE_KEY'] = value
+                    elif key == 'CLOB_API_KEY':
+                        os.environ['CLOB_API_KEY'] = value
+                    elif key == 'CLOB_API_SECRET':
+                        os.environ['CLOB_API_SECRET'] = value
+                    elif key == 'CLOB_PASSPHRASE':
+                        os.environ['CLOB_PASSPHRASE'] = value
+                    elif key == 'LIVE_TRADING':
+                        if value.lower() == 'true':
+                            os.environ['LIVE_TRADING'] = 'true'
+                except Exception as e:
+                    # print(f"Error parsing line {line}: {e}")
                     pass
-            elif key == 'PRIVATE_KEY':
-                os.environ['PRIVATE_KEY'] = value
-            elif key == 'CLOB_API_KEY':
-                os.environ['CLOB_API_KEY'] = value
-            elif key == 'CLOB_API_SECRET':
-                os.environ['CLOB_API_SECRET'] = value
-            elif key == 'CLOB_PASSPHRASE':
-                os.environ['CLOB_PASSPHRASE'] = value
-            elif key == 'LIVE_TRADING':
-                # Only enable if explicitly "true"
-                if value.lower() == 'true':
-                    os.environ['LIVE_TRADING'] = 'true'
 
 # Default if not set
 if 'PRICE_OFFSET_USD' not in locals():

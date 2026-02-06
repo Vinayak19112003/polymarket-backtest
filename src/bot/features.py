@@ -44,6 +44,7 @@ class TradingFeaturesV2:
     volatility_regime: int
     hour_sin: float
     hour_cos: float
+    h1_dist_ema: float = 0.0 # New: 1H Trend Distance
     
     def to_dict(self) -> Dict:
         return {
@@ -69,7 +70,9 @@ class TradingFeaturesV2:
             'momentum_score': self.momentum_score,
             'volatility_regime': self.volatility_regime,
             'hour_sin': self.hour_sin,
-            'hour_cos': self.hour_cos
+            'hour_sin': self.hour_sin,
+            'hour_cos': self.hour_cos,
+            'h1_dist_ema': self.h1_dist_ema
         }
 
 
@@ -234,6 +237,17 @@ class RealtimeFeatureEngineV2:
         atr_15m_val = tr.rolling(14).mean().iloc[-1]
         
         # ----------------------------------------------------------------------
+        # NEW: Multi-Timeframe (1H) Features
+        # Resample 15m -> 1H
+        # ----------------------------------------------------------------------
+        df_1h = df_15m.resample('1h').agg({'close': 'last'}).dropna()
+        ema_20_1h = df_1h['close'].ewm(span=20, adjust=False).mean()
+        
+        h1_dist_ema = 0.0
+        if len(df_1h) > 0 and len(ema_20_1h) > 0:
+            h1_dist_ema = (df_1h['close'].iloc[-1] / ema_20_1h.iloc[-1]) - 1
+        
+        # ----------------------------------------------------------------------
         # Legacy/Micro Features (Keep on 1m for granular fills?)
         # Actually, let's allow some 1m features for "Execution" precision
         # But the SIGNAL comes from 15m
@@ -306,7 +320,8 @@ class RealtimeFeatureEngineV2:
             momentum_score=momentum_score,
             volatility_regime=volatility_regime,
             hour_sin=hour_sin,
-            hour_cos=hour_cos
+            hour_cos=hour_cos,
+            h1_dist_ema=h1_dist_ema
         )
     
     def predict_probability(self, features: TradingFeaturesV2) -> float:
@@ -345,20 +360,64 @@ class RealtimeFeatureEngineV2:
         - RSI > 60: BUY NO (overbought, expect pullback)
         """
         if USE_MEAN_REVERSION:
-            # MEAN REVERSION STRATEGY (Unified Logic)
-            from src.features.strategy import check_mean_reversion_signal
+            # MEAN REVERSION STRATEGY (V2 Unified Logic + Filters)
+            from src.features.strategy import check_mean_reversion_signal_v2
             
+            # 1. Time-of-Day Filter (Illiquidity Check)
+            # UTC Hours 2-5 are low liquidity Asian session
+            BLOCKED_HOURS = [2, 3, 4, 5]
+            current_hour = features.timestamp.hour
+            
+            if current_hour in BLOCKED_HOURS:
+                 print(f"[DEBUG] Blocked: Illiquid Hour {current_hour} UTC")
+                 return (None, 0.0)
+            
+            # Boost edge during High Liquidity (12-21 UTC)
+            liquidity_boost = 1.0
+            if 12 <= current_hour <= 21:
+                liquidity_boost = 1.05
+            
+            # 2. V2 Signal Check (includes Volatility Filter)
+            # We pass current close & atr for volatility check
             rsi = features.rsi_14
             dist = features.dist_ema_50
             
-            signal, edge = check_mean_reversion_signal(rsi, dist)
+            signal, edge, reason = check_mean_reversion_signal_v2(
+                rsi_14=rsi, 
+                dist_ema_50=dist,
+                atr_15m=features.atr_15m,
+                close=features.close,
+                enable_vol_filter=True
+            )
             
-            if signal:
-                print(f"[DEBUG] SIGNAL {signal}! RSI={rsi:.2f}, Edge={edge:.2f} | Trend: {dist:.4f}")
-                return (signal, edge)
+            if not signal:
+                print(f"[DEBUG] No Signal. RSI={rsi:.2f} | Trend: {dist:.4f} | {reason}")
+                return (None, 0.0)
+                
+            # 3. Multi-Timeframe Confirmation (1H Trend)
+            h1_dist = features.h1_dist_ema
             
-            print(f"[DEBUG] No Signal. RSI={rsi:.2f} | Trend: {dist:.4f}")
-            return (None, 0.0)
+            if h1_dist > 0.02: # Strong 1H Uptrend
+                if signal == 'NO': # Blocking Counter-Trend Short
+                     print(f"[DEBUG] Blocked: Strong 1H Uptrend ({h1_dist:.4f}) blocks SHORT")
+                     return (None, 0.0)
+                elif signal == 'YES': # Boost Trend-Following Long
+                     edge *= 1.1
+                     reason += " + 1H Trend Boost"
+                     
+            elif h1_dist < -0.02: # Strong 1H Downtrend
+                if signal == 'YES': # Blocking Counter-Trend Long
+                     print(f"[DEBUG] Blocked: Strong 1H Downtrend ({h1_dist:.4f}) blocks LONG")
+                     return (None, 0.0)
+                elif signal == 'NO': # Boost Trend-Following Short
+                     edge *= 1.1
+                     reason += " + 1H Trend Boost"
+            
+            # Apply Liquidity Boost
+            edge *= liquidity_boost
+            
+            print(f"[DEBUG] SIGNAL {signal}! RSI={rsi:.2f}, Edge={edge:.2f} | {reason}")
+            return (signal, edge)
         
         else:
             # ML-BASED STRATEGY (original V2 logic)

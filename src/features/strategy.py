@@ -56,3 +56,61 @@ def check_mean_reversion_signal(rsi_14: float, dist_ema_50: float) -> Tuple[Opti
         return ('NO', min(0.5, edge))
         
     return (None, 0.0)
+
+def get_volatility_regime(atr_15m: float, close: float) -> str:
+    """
+    Determine volatility regime based on ATR percentage.
+    Thresholds: <0.3% Low, >0.8% High
+    """
+    if close == 0: return 'normal'
+    
+    atr_pct = (atr_15m / close) * 100
+    
+    if atr_pct < 0.3:
+        return 'low'
+    elif atr_pct > 0.8:
+        return 'high'
+    return 'normal'
+
+def check_mean_reversion_signal_v2(
+    rsi_14: float, 
+    dist_ema_50: float, 
+    atr_15m: Optional[float] = None, 
+    close: Optional[float] = None,
+    enable_vol_filter: bool = True,
+    ml_probability: Optional[float] = None
+) -> Tuple[Optional[str], float, str]:
+    """
+    Enhanced V2 Signal Check with Volatility filtering AND ML Confirmation.
+    Returns: (Signal, Edge, Reason)
+    """
+    signal, edge = check_mean_reversion_signal(rsi_14, dist_ema_50)
+    reason = "Standard V1 Signal"
+    
+    if not signal:
+        return (None, 0.0, "No Base Signal")
+        
+    # Apply Volatility Filter
+    if enable_vol_filter and atr_15m is not None and close is not None:
+        regime = get_volatility_regime(atr_15m, close)
+        
+        if regime == 'high':
+            # Skip high volatility
+            return (None, 0.0, f"Blocked: High Volatility (Regime: {regime})")
+            
+        elif regime == 'low':
+            # Boost edge in low volatility (more predictable)
+            edge *= 1.2
+            reason = f"Booster: Low Volatility (Regime: {regime})"
+            
+    # Apply ML Filter (Hybrid)
+    if ml_probability is not None:
+        if signal == 'YES' and ml_probability < 0.4:
+            return (None, 0.0, f"Blocked: ML bearish ({ml_probability:.2f})")
+        elif signal == 'NO' and ml_probability > 0.6:
+            return (None, 0.0, f"Blocked: ML bullish ({ml_probability:.2f})")
+        elif (signal == 'YES' and ml_probability > 0.6) or (signal == 'NO' and ml_probability < 0.4):
+            edge *= 1.15
+            reason += f" + ML Confirmed ({ml_probability:.2f})"
+            
+    return (signal, min(0.5, edge), reason)
