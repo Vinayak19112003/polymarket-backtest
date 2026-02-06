@@ -138,9 +138,9 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("VERDICT:")
     if pnl_1 > 500:
-        print("  1% Slippage: ✅ ROBUST (PnL > $500)")
+        print("  1% Slippage: ROBUST (PnL > $500)")
     elif pnl_1 > 400:
-        print("  1% Slippage: ⚠️ MARGINAL (PnL $400-$500)")
+        print("  1% Slippage: MARGINAL (PnL $400-$500)")
     else:
-        print("  1% Slippage: ❌ FRAGILE (PnL < $400)")
+        print("  1% Slippage: FRAGILE (PnL < $400)")
     print("=" * 60)
