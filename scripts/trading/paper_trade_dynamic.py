@@ -11,6 +11,10 @@ from typing import Optional, Dict, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+# Load .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 from src.features.strategy import check_mean_reversion_signal_v2
 from src.bot.orderbook_simulator import OrderbookSimulator
 from src.infrastructure.telegram_notifier import TelegramNotifier
