@@ -1,0 +1,9 @@
+[DEBUG] 15m Resample: 64 bars (From 949 1m candles)
+[DEBUG] Last 15m: 2026-01-28 06:00:00 Close: 89200.69
+[DEBUG] Calculated RSI: 52.1032401752998
+[DEBUG] 15m Resample: 201 bars (From 3000 1m candles)
+[DEBUG] Last 15m: 2026-01-28 06:30:00 Close: 89262.14
+[DEBUG] Calculated RSI: 59.714781639737446
+[DEBUG] 15m Resample: 200 bars (From 3000 1m candles)
+[DEBUG] Last 15m: 2026-01-28 08:00:00 Close: 89179.99
+[DEBUG] Calculated RSI: 58.02085076639907

@@ -1,0 +1,9 @@
+--- DEEP LOSS ANALYSIS ---
+Total Losses: 54
+Avg Loss: $-0.9069
+Side Bias:
+side
+YES    29
+NO     25
+Avg Entry (Losers): $0.4137
+Most Dangerous Price Zone: 40-60c

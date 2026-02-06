@@ -1,0 +1,29 @@
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+data/
+output/
+trading_bot.db
+bot_state.json
+*.csv
+.vscode/
+*.pkl
+models/
+demo/
+unwanted_files/
+demo_trades_real_polymarket.csv
+demo_equity_real_polymarket.csv
+
+# NodeJS / NextJS
+node_modules/
+.next/
+out/
+build/
+.DS_Store
+*.log
+web/node_modules/
+web/.next/

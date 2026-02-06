@@ -1,0 +1,27 @@
+
+Quantitative Backtest - 15 Minute Offset Analysis
+Strategy: RSI Mean Reversion (Fixed $0.50 Entry)
+Data: 2 Years (Binance 1m)
+
+Offset   | Trades   | Win Rate | ROI %      | Status
+-----------------------------------------------------------------     
+0min     | 34777    | 52.79%   | 1245.46%   | PROFIT (BEST)
+1min     | 34868    | 52.38%   | 964.64%    | PROFIT
+2min     | 34852    | 52.36%   | 946.96%    | PROFIT    
+3min     | 34910    | 52.36%   | 951.80%    | PROFIT    
+4min     | 35137    | 51.98%   | 690.26%    | PROFIT    
+5min     | 35479    | 52.06%   | 751.42%    | PROFIT    
+6min     | 35822    | 51.81%   | 579.56%    | PROFIT    
+7min     | 35547    | 51.87%   | 622.06%    | PROFIT
+8min     | 35753    | 51.74%   | 531.94%    | PROFIT (WORST)
+9min     | 35709    | 51.82%   | 582.82%    | PROFIT    
+10min    | 35646    | 52.01%   | 717.08%    | PROFIT
+11min    | 35520    | 51.87%   | 615.60%    | PROFIT
+12min    | 35254    | 52.35%   | 948.92%    | PROFIT
+13min    | 35169    | 52.06%   | 747.62%    | PROFIT
+14min    | 34835    | 52.66%   | 1156.30%   | PROFIT (2nd BEST)
+
+Summary:
+- Strongest Edge: Candle Close (:00) and Right Before Close (:14).
+- Weakest Edge: Middle of the Candle (:06 - :09).
+- Recommendation: Focus execution on minute 00/14.

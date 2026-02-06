@@ -1,0 +1,13 @@
+{
+  "final_balance": 1650.16,
+  "total_roi_percent": 1550.16,
+  "total_trades": 38913,
+  "avg_monthly_profit": 64.59,
+  "max_drawdown": -64.38,
+  "max_drawdown_percent": -6.2,
+  "yearly_breakdown": {
+    "2024": 928.98,
+    "2025": 564.66,
+    "2026": 56.52
+  }
+}

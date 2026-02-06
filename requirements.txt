@@ -1,0 +1,11 @@
+pandas
+numpy
+requests
+python-dotenv
+websocket-client
+xgboost
+scikit-learn
+pytest
+setuptools
+wheel
+
