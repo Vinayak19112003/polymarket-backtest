@@ -56,11 +56,11 @@ class DynamicMarketFinder:
                 data = response.json()
                 return data
             else:
-                print(f"   ⚠️ Market search failed: {response.status_code}")
+                print(f"   [WARN] Market search failed: {response.status_code}")
                 return []
         
         except Exception as e:
-            print(f"   ❌ Market search error: {type(e).__name__}: {e}")
+            print(f"   [ERROR] Market search error: {type(e).__name__}: {e}")
             return []
             
     def search_15m_markets_directly(self) -> List[Dict]:
@@ -78,7 +78,7 @@ class DynamicMarketFinder:
             return []
             
         except Exception as e:
-            print(f"   ❌ Error in 15M search: {e}")
+            print(f"   [ERROR] Error in 15M search: {e}")
             return []
             
     def find_market_by_slug_pattern(self) -> Optional[Dict]:
@@ -275,7 +275,7 @@ class DynamicMarketFinder:
             if btc_markets:
                 current = self.find_shortest_duration_market(btc_markets)
                 if current:
-                    if debug: print(f"   ✓ Found via Tag: {current.get('question')}")
+                    if debug: print(f"   [OK] Found via Tag: {current.get('question')}")
                     self._set_current_market(current)
                     return current
 
@@ -285,7 +285,7 @@ class DynamicMarketFinder:
         if slug_market:
              # Basic validation
              if self.filter_btc_15m_markets([slug_market]):
-                 if debug: print(f"   ✓ Found via Slug: {slug_market.get('question')}")
+                 if debug: print(f"   [OK] Found via Slug: {slug_market.get('question')}")
                  self._set_current_market(slug_market)
                  return slug_market
 
@@ -297,11 +297,11 @@ class DynamicMarketFinder:
         if btc_markets:
             current = self.find_shortest_duration_market(btc_markets)
             if current:
-                if debug: print(f"   ✓ Found via General Search: {current.get('question')}")
+                if debug: print(f"   [OK] Found via General Search: {current.get('question')}")
                 self._set_current_market(current)
                 return current
         
-        if debug: print("   ❌ No BTC 15-minute markets found")
+        if debug: print("   [FAIL] No BTC 15-minute markets found")
         return None
 
     
