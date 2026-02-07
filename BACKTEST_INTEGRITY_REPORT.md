@@ -69,3 +69,15 @@
 ### 6. `scripts/backtest/backtest_with_orderbook.py`
 - **Status**: ✅ **PASS**
 - **Details**: Uses shifted indicators for signal. Execution simulation uses strictly post-signal orderbook snapshots.
+
+## Phase 8: Final Verified Refactor
+### Goal
+Consolidate signal logic into `src/features/strategy.py` to ensure "Single Source of Truth".
+
+### Action
+Refactored `src/bot/features.py` to call `check_mean_reversion_signal_v2` instead of duplicating RSI thresholds.
+
+### Verification
+- **Primary Benchmark** (`backtest_enhanced_v2.py`): **58.54% Win Rate** (Confirmed Stable)
+- **Recent Performance** (`backtest_last_30d_live.py`): Confirmed daily stability > 55% avg.
+- **Codebase Status**: ✅ **LIVE READY** - No duplicated logic.

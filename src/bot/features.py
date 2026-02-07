@@ -230,32 +230,20 @@ class RealtimeFeatureEngineV2:
         if 12 <= current_hour <= 21:
             liquidity_boost = 1.05
         
-        # 2. V2 Signal Check
-        rsi = features.rsi_14
-        dist = features.dist_ema_50
+        # 2. V2 Signal Check (Delegated to Unified Strategy)
+        from src.features.strategy import check_mean_reversion_signal_v2
         
-        signal = None
-        edge = 0.0
-        reason = "V2 Analysis Strategy"
-        
-        if rsi < RSI_OVERSOLD:
-            signal = 'YES'
-            edge = (RSI_OVERSOLD - rsi) / RSI_OVERSOLD
-            reason = f"Oversold (RSI {rsi:.2f} < {RSI_OVERSOLD})"
-        elif rsi > RSI_OVERBOUGHT:
-            signal = 'NO'
-            edge = (rsi - RSI_OVERBOUGHT) / (100 - RSI_OVERBOUGHT)
-            reason = f"Overbought (RSI {rsi:.2f} > {RSI_OVERBOUGHT})"
+        signal, edge, reason = check_mean_reversion_signal_v2(
+            rsi_14=features.rsi_14,
+            dist_ema_50=features.dist_ema_50,
+            atr_15m=features.atr_15m,
+            close=features.close,
+            enable_vol_filter=True, # Unified Volatility Check
+            ml_probability=probability
+        )
         
         if not signal:
             return (None, 0.0)
-            
-        # Volatility Filter
-        if features.atr_15m > 0 and features.close > 0:
-            atr_pct = (features.atr_15m / features.close) * 100
-            if atr_pct > 0.8:
-                print(f"[DEBUG] Blocked: High Volatility (ATR {atr_pct:.2f}%)")
-                return (None, 0.0)
             
         # 3. Multi-Timeframe Confirmation
         h1_dist = features.h1_dist_ema
