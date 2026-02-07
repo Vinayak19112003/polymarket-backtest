@@ -19,11 +19,28 @@ python src/bot/main.py
 python scripts/backtest/backtest_enhanced_v2.py
 ```
 
-## 📂 Directory Structure
-- `src/` - Production V2 code (SINGLE SOURCE OF TRUTH)
-- `scripts/backtest/` - V2 backtesting & analysis
-- `scripts/trading/` - Paper trading & live tools
-- `archive/v1_baseline/` - Legacy V1 (REFERENCE ONLY)
+## 📂 Repository Structure
+
+```
+polymarket-backtest/
+├── src/
+│   ├── bot/           # Live trading bot
+│   ├── features/      # Strategy logic (unified)
+│   └── ...
+├── scripts/
+│   ├── backtest/      # Production backtest scripts
+│   │   ├── utils/     # Helper utilities
+│   │   └── README.md  # Backtest documentation
+│   └── trading/       # Live/paper trading
+├── results/           # Backtest outputs
+├── archive/
+│   ├── deprecated/    # Invalid/old scripts
+│   └── v1_baseline/   # Historical baseline
+├── BACKTEST_INTEGRITY_REPORT.md  # Audit results
+└── README.md
+```
+
+See [scripts/backtest/README.md](scripts/backtest/README.md) for detailed backtest documentation.
 
 ## 📊 V2 Performance (Validated)
 - **Win Rate:** 58.01%
