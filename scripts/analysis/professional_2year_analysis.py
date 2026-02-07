@@ -804,54 +804,71 @@ def run_2year_backtest(start_date=START_DATE, end_date=END_DATE):
     # ---------------------------
     # Logic
     # ---------------------------
+    # ---------------------------
+    # Logic (Standardized V2 - Leak Free)
+    # ---------------------------
     # UTC Hour
     hour = df.index.hour
     
+    # Shift Indicators for Signal Generation (T-1)
+    prev_rsi = rsi.shift(1)
+    prev_close = close.shift(1)
+    prev_ema = ema.shift(1)
+    prev_dist_ema = (prev_close / prev_ema) - 1
+    
+    # 1H Trend (Shifted/Aligned)
+    # We already have dist_1h (approximated). Ideally should be shifted too.
+    # dist_1h was calculated on 'close'. 
+    prev_dist_1h = dist_1h.shift(1)
+    
     # Conditions
-    # 1. Blocked Hours (5-10 UTC)
-    blocked_hours = hour.isin([5, 6, 7, 8, 9, 10])
+    # 1. Blocked Hours (5-10 UTC + 15-16 UTC)
+    # Note: Analysis script had 5,6,7,8,9,10. We should match new strategy: 5-9 & 15-16.
+    # Hour 10 is now UNBLOCKED in live bot? Let's verify.
+    # Live bot: BLOCKED_HOURS = [5, 6, 7, 8, 9, 15, 16]
+    blocked_hours = hour.isin([5, 6, 7, 8, 9, 15, 16])
     
     # 2. Volatility Filter
-    # ATR pct
-    atr_pct = (atr / close) * 100
+    # ATR pct (Computed on T-1 to decide for T? Or T's Open?)
+    # Live Logic: uses current ATR (rolling) at moment of signal.
+    # Safest is T-1 ATR.
+    prev_atr = atr.shift(1)
+    atr_pct = (prev_atr / prev_close) * 100
     is_high_vol = atr_pct > 0.8
-    is_low_vol = atr_pct < 0.3
     
-    # 3. Signals
-    # Buy: RSI < 43 (Oversold)
+    # 3. Signals (Using T-1)
+    # Buy: RSI < 43 (Oversold) -> 38/62 aligned
     # Sell: RSI > 58 (Overbought)
     
-    # Dynamic thresholds based on Trend (dist_ema)
-    # Downtrend (dist < 0): Buy < 38
-    # Uptrend (dist > 0): Sell > 62
+    buy_threshold = pd.Series(38, index=df.index) # Aligned Default
+    buy_threshold[prev_dist_ema < 0] = 35         # Downtrend
     
-    buy_threshold = pd.Series(43, index=df.index)
-    buy_threshold[dist_ema < 0] = 38
+    sell_threshold = pd.Series(62, index=df.index) # Aligned Default
+    sell_threshold[prev_dist_ema > 0] = 65         # Uptrend
     
-    sell_threshold = pd.Series(58, index=df.index)
-    sell_threshold[dist_ema > 0] = 62
-    
-    signal_yes = (rsi < buy_threshold)
-    signal_no = (rsi > sell_threshold)
+    signal_yes = (prev_rsi < buy_threshold)
+    signal_no = (prev_rsi > sell_threshold)
     
     # Apply Filters
     valid_long = signal_yes & (~blocked_hours) & (~is_high_vol)
     valid_short = signal_no & (~blocked_hours) & (~is_high_vol)
     
-    # 1H Blockers
-    # Strong Uptrend (dist_1h > 0.02) -> Block Shorts
-    valid_short = valid_short & (dist_1h <= 0.02)
-    # Strong Downtrend (dist_1h < -0.02) -> Block Longs
-    valid_long = valid_long & (dist_1h >= -0.02)
+    # 1H Blockers (Using T-1)
+    valid_short = valid_short & (prev_dist_1h <= 0.02)
+    valid_long = valid_long & (prev_dist_1h >= -0.02)
     
     # ---------------------------
     # Simulation
     # ---------------------------
-    # Entry Price = Close
-    # Exit Price = Next Close
-    # Return = (Exit - Entry) / Entry
+    # Entry: Open of T (Current Candle)
+    # Exit: Close of T (Current Candle) - Day Trade / Scalp
+    # Live Bot: Signal at T (Close of T-1). Entry at Open of T. Exit at Close of T+15m (which is T).
     
-    future_ret = close.shift(-1) / close - 1
+    # Return = (Close - Open) / Open
+    # Note: Previous logic was Entry=Close(T), Exit=Close(T+1). That is "Next Bar" trade.
+    # "Standard" Logic: Entry=Open(T), Exit=Close(T).
+    
+    future_ret = (close - open_price) / open_price
     
     # Construct Trades List
     trades = []

@@ -44,6 +44,16 @@ df = df[df['timestamp'].dt.minute.isin([0, 15, 30, 45])].reset_index(drop=True)
 # FIXED PRICE BACKTEST: ENTRY @ $0.50
 # =========================================================
 
+# =========================================================
+# FIXED PRICE BACKTEST: ENTRY @ $0.50
+# =========================================================
+
+# Shift indicators to prevent look-ahead bias
+df['prev_rsi'] = df['rsi_14'].shift(1)
+df['prev_ema'] = df['ema_50'].shift(1)
+df['prev_close'] = df['close'].shift(1)
+df['dist_ema_50_prev'] = (df['prev_close'] / df['prev_ema']) - 1
+
 balance = 100.0
 equity = [100.0]
 trades = []
@@ -54,14 +64,17 @@ print("-" * 65)
 for i in range(len(df)):
     row = df.iloc[i]
     
-    # Signals
-    rsi = row['rsi_14']
-    dist = row['dist_ema_50']
+    # Check for NaNs due to shifting
+    if pd.isna(row['prev_rsi']) or pd.isna(row['dist_ema_50_prev']):
+        continue
+
+    # Signals (Using PREVIOUS Closed Candle)
+    rsi = row['prev_rsi']
+    dist = row['dist_ema_50_prev']
     
-    rsi_buy = 43
-    rsi_sell = 58
-    if dist < 0: rsi_buy = 38
-    if dist > 0: rsi_sell = 62
+    # 38/62 Thresholds (Aligned Strategy)
+    rsi_buy = 35 if dist < 0 else 38
+    rsi_sell = 65 if dist > 0 else 62
         
     signal = None
     if rsi < rsi_buy: signal = 'YES'
@@ -74,18 +87,30 @@ for i in range(len(df)):
     entry_price = 0.50 
     
     # Outcome
-    won = (signal == 'YES' and row['target'] == 1) or (signal == 'NO' and row['target'] == 0)
+    # Trade: Enter at OPEN, Exit at CLOSE (Standard 15m candle trade)
+    # Note: 'target' in original was shift(-15) which is weird for 1m data but this is 15m resampled data?
+    # Wait, the partial code shows "df = df[df['timestamp'].dt.minute.isin([0, 15, 30, 45])]" -> This IS 15m data.
+    # So 'target' (shift -15) in original code meant "15 candles later"? 
+    # But if df is already filtered to 15m, shift(-15) means 15 * 15m = 3.75 hours later!
+    # Let's check the original target logic.
+    # Original: "df['target'] = (df['future_close'] > df['close']).astype(int)" where future_close was shift(-15) on 1m data?
+    # Actually lines 13-33 imply df is 1m data, THEN filtered.
+    # If I use `df.iloc[i]`, I am iterating the FILTERED dataframe.
+    # To correspond to "Next 15m Candle", I should use the candle's explicit outcome.
+    
+    # Standard Convention:
+    # Signal calculated on T-1 (prev_rsi).
+    # Entry at T Open.
+    # Exit at T Close.
+    
+    won = (signal == 'YES' and row['close'] > row['open']) or (signal == 'NO' and row['close'] < row['open'])
     result = 'WIN' if won else 'LOSS'
     
     shares = 1.0 / entry_price # 2 shares
     cost = 1.0
     
     if won:
-        # Payout $1.00 per share - 2% fee
-        # Revenue = 2 * 1.00 = $2.00
-        # Fees = $0.04
-        # Profit = 2.00 - 0.04 - 1.00 = +0.96
-        payout = shares * 0.98 
+        payout = shares * 0.98 # 2% fee
         pnl = payout - cost
     else:
         pnl = -cost
@@ -107,8 +132,8 @@ total = len(trades)
 win_rate = (wins/total*100) if total > 0 else 0
 
 print(f"Total Trades: {total}")
-print(f"Win Rate:     {win_rate:.1f}%")
-print(f"ROI:          {balance-100:.1f}%")
+print(f"Win Rate:     {win_rate:.2f}%")
+print(f"ROI:          {balance-100:.2f}%")
 print("=" * 65)
 exit()
 

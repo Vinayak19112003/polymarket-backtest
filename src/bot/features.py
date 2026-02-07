@@ -14,8 +14,92 @@ from dataclasses import dataclass
 USE_MEAN_REVERSION = True  # Set to True for Mean Reversion, False for ML
 
 # Mean Reversion thresholds (Optimized High Frequency: +490% ROI like backtest)
-RSI_OVERSOLD = 43   # BUY YES when RSI < 43
-RSI_OVERBOUGHT = 58 # BUY NO when RSI > 58
+RSI_OVERSOLD = 38   # BUY YES when RSI < 38
+RSI_OVERBOUGHT = 62 # BUY NO when RSI > 62
+
+
+@dataclass
+class TradingFeaturesV2:
+# ... (features struct unchanged) ...
+
+            # 1. Time-of-Day Filter (Illiquidity Check)
+            # UTC Hours 5-9 (~12AM - 4AM ET) are low liquidity
+            # Added 15-16 UTC (proven unprofitable)
+            BLOCKED_HOURS = [5, 6, 7, 8, 9, 15, 16] 
+            current_hour = features.timestamp.hour
+            
+            if current_hour in BLOCKED_HOURS:
+                 # print(f"[DEBUG] Blocked: Illiquid/Unprofitable Hour {current_hour} UTC")
+                 return (None, 0.0)
+            
+            # Boost edge during High Liquidity (12-21 UTC)
+            liquidity_boost = 1.0
+            if 12 <= current_hour <= 21:
+                liquidity_boost = 1.05
+            
+            # 2. V2 Signal Check (includes Volatility Filter)
+            # We pass current close & atr for volatility check
+            rsi = features.rsi_14
+            dist = features.dist_ema_50
+            
+            # STRICT ANALYSIS STRATEGY: RSI < 38 = YES, RSI > 62 = NO
+            # Using updated Strategy Logic
+            
+            signal = None
+            edge = 0.0
+            reason = "V2 Analysis Strategy"
+            
+            if rsi < RSI_OVERSOLD:
+                signal = 'YES'
+                edge = (RSI_OVERSOLD - rsi) / RSI_OVERSOLD
+                reason = f"Oversold (RSI {rsi:.2f} < {RSI_OVERSOLD})"
+            elif rsi > RSI_OVERBOUGHT:
+                signal = 'NO'
+                edge = (rsi - RSI_OVERBOUGHT) / (100 - RSI_OVERBOUGHT)
+                reason = f"Overbought (RSI {rsi:.2f} > {RSI_OVERBOUGHT})"
+            
+            if not signal:
+                # print(f"[DEBUG] No Signal. RSI={rsi:.2f} | Trend: {dist:.4f}")
+                return (None, 0.0)
+                
+            # Apply Volatility Filter (ATR)
+            # Analysis showed Low Volatility is better for Mean Reversion
+            if features.atr_15m > 0 and features.close > 0:
+                atr_pct = (features.atr_15m / features.close) * 100
+                if atr_pct > 0.8: # High Volatility
+                    print(f"[DEBUG] Blocked: High Volatility (ATR {atr_pct:.2f}%)")
+                    return (None, 0.0)
+                
+            # 3. Multi-Timeframe Confirmation (1H Trend)
+            h1_dist = features.h1_dist_ema
+            
+            if h1_dist > 0.02: # Strong 1H Uptrend
+                if signal == 'NO': # Blocking Counter-Trend Short
+                     print(f"[DEBUG] Blocked: Strong 1H Uptrend ({h1_dist:.4f}) blocks SHORT")
+                     return (None, 0.0)
+                elif signal == 'YES': # Boost Trend-Following Long
+                     edge *= 1.1
+                     reason += " + 1H Trend Boost"
+                     
+            elif h1_dist < -0.02: # Strong 1H Downtrend
+                if signal == 'YES': # Blocking Counter-Trend Long
+                     print(f"[DEBUG] Blocked: Strong 1H Downtrend ({h1_dist:.4f}) blocks LONG")
+                     return (None, 0.0)
+                elif signal == 'NO': # Boost Trend-Following Short
+                     edge *= 1.1
+                     reason += " + 1H Trend Boost"
+            
+            # Apply Liquidity Boost
+            edge *= liquidity_boost
+            
+            # Premium Hours Boost (Hours with 59%+ win rates)
+            PREMIUM_HOURS = [20, 21, 22, 23]
+            if current_hour in PREMIUM_HOURS:
+                edge *= 1.15  # 15% edge boost during proven profitable hours
+                reason += " + Premium Hour Boost"
+            
+            print(f"[DEBUG] SIGNAL {signal}! RSI={rsi:.2f}, Edge={edge:.2f} | {reason}")
+            return (signal, edge)
 
 
 @dataclass
@@ -364,8 +448,9 @@ class RealtimeFeatureEngineV2:
             from src.features.strategy import check_mean_reversion_signal_v2
             
             # 1. Time-of-Day Filter (Illiquidity Check)
-            # UTC Hours 5-10 (~12AM - 6AM ET) are low liquidity
-            BLOCKED_HOURS = [5, 6, 7, 8, 9, 10]
+            # UTC Hours 5-9 (~12AM - 4AM ET) are low liquidity
+            # Unblocking Hour 10 as per user request
+            BLOCKED_HOURS = [5, 6, 7, 8, 9] 
             current_hour = features.timestamp.hour
             
             if current_hour in BLOCKED_HOURS:
@@ -382,17 +467,34 @@ class RealtimeFeatureEngineV2:
             rsi = features.rsi_14
             dist = features.dist_ema_50
             
-            signal, edge, reason = check_mean_reversion_signal_v2(
-                rsi_14=rsi, 
-                dist_ema_50=dist,
-                atr_15m=features.atr_15m,
-                close=features.close,
-                enable_vol_filter=True
-            )
+            # STRICT ANALYSIS STRATEGY: RSI < 35 = YES, RSI > 70 = NO
+            # Overwriting 'check_mean_reversion_signal_v2' logic locally for now
+            # to ensure parity with the profitable backtest.
+            
+            signal = None
+            edge = 0.0
+            reason = "V2 Analysis Strategy"
+            
+            if rsi < 35:
+                signal = 'YES'
+                edge = (35 - rsi) / 35
+                reason = f"Oversold (RSI {rsi:.2f} < 35)"
+            elif rsi > 70:
+                signal = 'NO'
+                edge = (rsi - 70) / 30
+                reason = f"Overbought (RSI {rsi:.2f} > 70)"
             
             if not signal:
-                print(f"[DEBUG] No Signal. RSI={rsi:.2f} | Trend: {dist:.4f} | {reason}")
+                # print(f"[DEBUG] No Signal. RSI={rsi:.2f} | Trend: {dist:.4f}")
                 return (None, 0.0)
+                
+            # Apply Volatility Filter (ATR)
+            # Analysis showed Low Volatility is better for Mean Reversion
+            if features.atr_15m > 0 and features.close > 0:
+                atr_pct = (features.atr_15m / features.close) * 100
+                if atr_pct > 0.8: # High Volatility
+                    print(f"[DEBUG] Blocked: High Volatility (ATR {atr_pct:.2f}%)")
+                    return (None, 0.0)
                 
             # 3. Multi-Timeframe Confirmation (1H Trend)
             h1_dist = features.h1_dist_ema

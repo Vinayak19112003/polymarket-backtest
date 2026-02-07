@@ -53,20 +53,36 @@ def run_strategy(df):
     df['target'] = (df['future_close'] > df['close']).astype(int)
     
     # STRICT FILTER
+    # Shift indicators to prevent look-ahead bias
+    df['prev_rsi'] = df['rsi_14'].shift(1)
+    df['prev_ema'] = df['ema_50'].shift(1)
+    df['prev_close'] = df['close'].shift(1)
+    df['dist_ema_50_prev'] = (df['prev_close'] / df['prev_ema']) - 1
+    
+    # STRICT FILTER
     df = df.dropna()
     df = df[df['timestamp'].dt.minute.isin([0, 15, 30, 45])].reset_index(drop=True)
     
     trades = []
     
+    # Constants from Strategy
+    FEES = 0.02
+    ENTRY_PRICE = 0.50
+    
     for i in range(len(df)):
         row = df.iloc[i]
-        rsi = row['rsi_14']
-        dist = row['dist_ema_50']
         
-        rsi_buy = 43
-        rsi_sell = 58
-        if dist < 0: rsi_buy = 38
-        if dist > 0: rsi_sell = 62
+        # Check for NaNs
+        if pd.isna(row['prev_rsi']) or pd.isna(row['dist_ema_50_prev']):
+            continue
+
+        # Signals (Using PREVIOUS Closed Candle)
+        rsi = row['prev_rsi']
+        dist = row['dist_ema_50_prev']
+        
+        # 38/62 Thresholds (Aligned Strategy)
+        rsi_buy = 35 if dist < 0 else 38
+        rsi_sell = 65 if dist > 0 else 62
             
         signal = None
         if rsi < rsi_buy: signal = 'YES'
@@ -75,7 +91,11 @@ def run_strategy(df):
         if not signal: continue
         
         # Outcome
-        won = (signal == 'YES' and row['target'] == 1) or (signal == 'NO' and row['target'] == 0)
+        # Entry at Open, Exit at Close
+        # Note: 'target' column is no longer needed/valid with the shift logic
+        # We rely on the candle's explicit O/C
+        
+        won = (signal == 'YES' and row['close'] > row['open']) or (signal == 'NO' and row['close'] < row['open'])
         res_str = "WIN" if won else "LOSS"
         
         trades.append({

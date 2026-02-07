@@ -32,6 +32,14 @@ python scripts/backtest/backtest_enhanced_v2.py
 - **Risk of Ruin:** 0.0%
 - **Stability (CV):** 0.79 (Excellent)
 
+## Strategy Parameters (Production v2.1.0)
+- **RSI Oversold**: 38 (Buy YES when RSI < 38)
+- **RSI Overbought**: 62 (Buy NO when RSI > 62)
+- **Blocked Hours**: 5-9 UTC, 15-16 UTC (Low liquidity / unprofitable)
+- **Premium Hours**: 20-23 UTC (Highest win rates)
+- **Entry Price**: Dynamic (Mean Reversion)
+- **Risk Per Trade**: 1% (non-compounding)
+
 ## ⚠️ Version Warnings
 - ❌ DO NOT use files from `archive/v1_baseline/`
 - ❌ DO NOT mix V1 and V2 strategy logic

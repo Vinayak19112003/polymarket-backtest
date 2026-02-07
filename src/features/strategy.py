@@ -6,12 +6,12 @@ Central definition of trading rules to ensure Backtest/Live parity.
 from typing import Tuple, Optional
 
 # Constants
-RSI_OVERSOLD_DEFAULT = 43
-RSI_OVERBOUGHT_DEFAULT = 58
+RSI_OVERSOLD_DEFAULT = 38  # Stricter - matches profitable downtrend threshold
+RSI_OVERBOUGHT_DEFAULT = 62  # Stricter - matches profitable uptrend threshold
 
 # Dynamic Adjustment Constants
-RSI_BUY_DOWNTREND = 38
-RSI_SELL_UPTREND = 62
+RSI_BUY_DOWNTREND = 35 # Even stricter in downtrend
+RSI_SELL_UPTREND = 65 # Even stricter in uptrend
 
 def get_mean_reversion_thresholds(dist_ema_50: float) -> Tuple[int, int]:
     """
