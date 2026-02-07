@@ -71,6 +71,35 @@ class DynamicPaperTrader:
         with open(self.log_file, 'a') as f:
             f.write(log_entry + "\n")
     
+    def run_diagnostics(self):
+         """Run startup diagnostics."""
+         self._log("=== DIAGNOSTIC CHECK ===")
+         self._log("Testing Polymarket connectivity...")
+         
+         # Test market search
+         try:
+             test_markets = self.market_finder.search_markets(active_only=True)
+             self._log(f"Can access markets API: {len(test_markets)} markets found")
+         except Exception as e:
+             self._log(f"ERROR: Market API failed: {e}")
+
+         # Test orderbook API with a known token (or empty check)
+         try:
+             # Use a generic token ID or fetch from a market to be sure
+             # If we have markets, use one
+             if self.market_finder.search_markets(active_only=True):
+                  # This is just a test, logic above already verified markets
+                  pass
+             
+             test_token = "16678291189211314787145083999015737376658799626183230671758641503291735614088"  # Example
+             test_ob = self.orderbook.fetch_live_orderbook(test_token)
+             self._log(f"Can access orderbook API: {test_ob is not None}")
+             
+         except Exception as e:
+             self._log(f"ERROR: Orderbook API failed: {e}")
+         
+         self._log("=== DIAGNOSTIC COMPLETE ===\n")
+
     def update_current_market(self) -> bool:
         """Update to current active market."""
         
@@ -95,6 +124,19 @@ class DynamicPaperTrader:
         self.current_market_id = market_info.get('condition_id')
         self.current_token_id = market_info['tokens'].get('Yes')
         self.market_question = market_info.get('question')
+        
+        # VALIDATE TOKEN ID
+        if not self.current_token_id:
+            self._log("ERROR: No YES token ID found in market")
+            return False
+        
+        self._log(f"   Token ID (YES): {self.current_token_id[:30]}...")
+        
+        # TEST ORDERBOOK IMMEDIATELY
+        test_book = self.orderbook.fetch_live_orderbook(self.current_token_id)
+        if not test_book:
+            self._log("WARNING: Cannot fetch orderbook for this market")
+            # Continue anyway but log warning
         
         time_remaining = market_info.get('time_remaining', 0) / 60
         
@@ -355,6 +397,9 @@ Now monitoring this market for signals
         """Run dynamic paper trading."""
         
         self._log(f"Starting dynamic paper trading for {duration_hours} hours...")
+        
+        # Run diagnostics
+        self.run_diagnostics()
         
         # Test Telegram
         if not self.notifier.test_connection():

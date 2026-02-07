@@ -193,5 +193,5 @@ Good luck! 🚀
 """
         success = self.send_message(message)
         if success:
-            print("✅ Telegram test message sent!")
+            print("[SUCCESS] Telegram test message sent!")
         return success
