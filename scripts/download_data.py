@@ -9,6 +9,9 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 FILE_PATH = os.path.join(DATA_DIR, 'btcusdt_1m.csv')
 
+
+import time
+
 def download_btc_data_range(start_str: str, end_str: str):
     """
     Download 1m BTC data from Binance for a specific range.
@@ -18,12 +21,16 @@ def download_btc_data_range(start_str: str, end_str: str):
     
     try:
         # Convert to timestamps (ms)
-        start_ts = int(datetime.strptime(start_str, '%Y-%m-%d').replace(tzinfo=timezone.utc).timestamp() * 1000)
-        end_date = datetime.strptime(end_str, '%Y-%m-%d').replace(tzinfo=timezone.utc) + timedelta(days=1)
-        end_ts = int(end_date.timestamp() * 1000)
+        start_date = datetime.strptime(start_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        start_ts = int(start_date.timestamp() * 1000)
+        
+        end_date_obj = datetime.strptime(end_str, '%Y-%m-%d').replace(tzinfo=timezone.utc) + timedelta(days=1)
+        end_ts = int(end_date_obj.timestamp() * 1000)
         
         all_data = []
         current_start = start_ts
+        
+        total_time = (end_ts - start_ts)
         
         while current_start < end_ts:
             url = "https://api.binance.com/api/v3/klines"
@@ -34,22 +41,40 @@ def download_btc_data_range(start_str: str, end_str: str):
                 "startTime": current_start,
                 "endTime": end_ts
             }
-            # print(f"Fetching chunk from {current_start}...")
-            res = requests.get(url, params=params)
-            data = res.json()
+            
+            # Rate limit handling (Binance is generous but let's be safe)
+            # Sleep 0.1s every request
+            time.sleep(0.1)
+            
+            try:
+                res = requests.get(url, params=params, timeout=10)
+                if res.status_code != 200:
+                    print(f"Error {res.status_code}: {res.text}")
+                    time.sleep(5) # Backoff
+                    continue
+                    
+                data = res.json()
+            except Exception as req_err:
+                 print(f"Request Error: {req_err}")
+                 time.sleep(5)
+                 continue
             
             if not data or not isinstance(data, list):
                 break
                 
             all_data.extend(data)
             
-            # Update start time to last close time + 1ms
+            # Progress Tracking
             last_close_time = data[-1][6]
             current_start = last_close_time + 1
+            
+            progress = min(100, (current_start - start_ts) / total_time * 100)
+            print(f"\rProgress: {progress:.2f}% | Fetched {len(all_data)} rows", end='')
             
             if len(data) < 1000:
                 break
         
+        print("\nParsing data...")
         # Parse
         df = pd.DataFrame(all_data, columns=[
             "open_time", "open", "high", "low", "close", "volume",
@@ -69,5 +94,5 @@ def download_btc_data_range(start_str: str, end_str: str):
         print(f"Error downloading data: {e}")
 
 if __name__ == "__main__":
-    # Download 10 days + buffer: Jan 26 to Feb 8
-    download_btc_data_range('2026-01-26', '2026-02-08')
+    # Download 2 Years: Feb 2024 to Feb 2026
+    download_btc_data_range('2024-02-07', '2026-02-08')

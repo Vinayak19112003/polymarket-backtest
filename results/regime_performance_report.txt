@@ -1,0 +1,8 @@
+MARKET REGIME PERFORMANCE
+=========================
+                  count   sum      mean
+trend vol_regime                       
+Bear  High Vol     2848  3780  1.327247
+      Low Vol      2302  3140  1.364031
+Bull  High Vol     1635  1030  0.629969
+      Low Vol      3766  3340  0.886883
