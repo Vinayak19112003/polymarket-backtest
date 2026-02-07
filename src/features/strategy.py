@@ -85,7 +85,7 @@ def check_mean_reversion_signal_v2(
     Returns: (Signal, Edge, Reason)
     """
     signal, edge = check_mean_reversion_signal(rsi_14, dist_ema_50)
-    reason = "Standard V1 Signal"
+    reason = "V2 Enhanced (Base)"
     
     if not signal:
         return (None, 0.0, "No Base Signal")

@@ -364,8 +364,8 @@ class RealtimeFeatureEngineV2:
             from src.features.strategy import check_mean_reversion_signal_v2
             
             # 1. Time-of-Day Filter (Illiquidity Check)
-            # UTC Hours 2-5 are low liquidity Asian session
-            BLOCKED_HOURS = [2, 3, 4, 5]
+            # UTC Hours 5-10 (~12AM - 6AM ET) are low liquidity
+            BLOCKED_HOURS = [5, 6, 7, 8, 9, 10]
             current_hour = features.timestamp.hour
             
             if current_hour in BLOCKED_HOURS:
