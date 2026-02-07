@@ -1,24 +1,9 @@
-
+================================================================================
 EXECUTIVE SUMMARY
-=================
-Analysis Period: 2024-02-07 to 2026-02-06
-Duration: 730 days (2.00 years)
+================================================================================
 
-PERFORMANCE METRICS
--------------------
-Total Trades:       10551
-Win Rate:           55.35%
-Total PnL:         $11290.00
-Final Equity:      $11390.00 (Start: $100.0)
-CAGR:               968.97%
-Sharpe Ratio:       7.82
-Profit Factor:      1.24
-Expectancy:        $1.07 per trade
-
-RISK METRICS
-------------
-Max Drawdown:      $210.00
-Max Drawdown %:     73.33%
-Worst Trade:       $-10.00
-Best Trade:        $10.00
-            
+Win Rate: 55.35%
+Total PnL: $1129.00
+Sharpe Ratio: 8.56
+Max Drawdown: $21.00
+Recent Win Rate: 58.63%

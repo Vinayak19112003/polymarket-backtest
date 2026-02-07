@@ -4,5 +4,5 @@ SIGNAL QUALITY REPORT
 Performance by Signal Type:
         Count   Avg PnL  Total PnL  Win Rate %
 signal                                        
-NO       5485  1.168642       6410   55.843209
-YES      5066  0.963285       4880   54.816423
+NO       5485  0.116864      641.0   55.843209
+YES      5066  0.096328      488.0   54.816423

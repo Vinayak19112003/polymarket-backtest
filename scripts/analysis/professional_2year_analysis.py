@@ -27,6 +27,7 @@ warnings.filterwarnings('ignore')
 START_DATE = "2024-02-07"
 END_DATE = "2026-02-07"
 INITIAL_CAPITAL = 100.0
+RISK_PER_TRADE = 1.0 # Fixed risk per trade
 RISK_FREE_RATE = 0.05  # 5% annual
 
 # Ensure output directories exist
@@ -35,56 +36,91 @@ os.makedirs('results/charts', exist_ok=True)
 class TradingStrategyAnalyzer:
     """Comprehensive trading strategy analyzer"""
     
-    def __init__(self, trades_df: pd.DataFrame):
-        self.trades = trades_df.copy()
-        if self.trades.empty:
-            print("Warning: No trades provided for analysis.")
+    def __init__(self, trades_df: Optional[pd.DataFrame] = None):
+        if trades_df is not None and not trades_df.empty:
+            self.trades = trades_df.copy()
+        else:
+            self.trades = self.load_data()
+            
+        self.results_dir = "results"
+        self.charts_dir = "results/charts"
+        os.makedirs(self.charts_dir, exist_ok=True)
+            
+        if self.trades is None or self.trades.empty:
+            print("Warning: No trades provided or found for analysis.")
             return
             
-        self.prepare_data()
+        self.enrich_data()
         
-    def prepare_data(self):
-        """Prepare and enrich data for analysis"""
+    def load_data(self) -> Optional[pd.DataFrame]:
+        """Load trade data from multiple possible sources."""
+        data_files = [
+            'results/backtest_2year.csv',
+            'data/backtest_trades_2year.csv',
+            'results/all_trades.csv'
+        ]
+        
+        for filepath in data_files:
+            if os.path.exists(filepath):
+                print(f"Loading data from: {filepath}")
+                try:
+                    df = pd.read_csv(filepath)
+                    print(f"✅ Loaded {len(df)} trades")
+                    return df
+                except Exception as e:
+                    print(f"Error loading {filepath}: {e}")
+        
+        return None
+
+    def enrich_data(self):
+        """Add all temporal and analytical features."""
+        df = self.trades
+        
         # Convert timestamps
-        if 'timestamp' in self.trades.columns:
-             self.trades['timestamp'] = pd.to_datetime(self.trades['timestamp'])
-        elif 'entry_time' in self.trades.columns:
-             self.trades['timestamp'] = pd.to_datetime(self.trades['entry_time']) # Use entry time as primary
+        if 'timestamp' in df.columns:
+             df['timestamp'] = pd.to_datetime(df['timestamp'])
+        elif 'entry_time' in df.columns:
+             df['timestamp'] = pd.to_datetime(df['entry_time'])
         
         # Sort by time
-        self.trades = self.trades.sort_values('timestamp')
+        df = df.sort_values('timestamp')
         
-        # Extract time features
-        self.trades['year'] = self.trades['timestamp'].dt.year
-        self.trades['quarter'] = self.trades['timestamp'].dt.quarter
-        self.trades['month'] = self.trades['timestamp'].dt.month
-        self.trades['day_of_week'] = self.trades['timestamp'].dt.dayofweek
-        self.trades['hour'] = self.trades['timestamp'].dt.hour
-        self.trades['day_name'] = self.trades['timestamp'].dt.day_name()
+        # Temporal features
+        df['year'] = df['timestamp'].dt.year
+        df['quarter'] = df['timestamp'].dt.quarter
+        df['month'] = df['timestamp'].dt.month
+        df['month_name'] = df['timestamp'].dt.strftime('%Y-%m')
+        df['day_of_week'] = df['timestamp'].dt.dayofweek
+        df['day_name'] = df['timestamp'].dt.day_name()
+        df['hour'] = df['timestamp'].dt.hour
+        df['is_weekend'] = df['day_of_week'].isin([5, 6])
         
-        # Calculate cumulative metrics (Assuming consistent 'pnl' column)
-        self.trades['cumulative_pnl'] = self.trades['pnl'].cumsum()
-        self.trades['equity'] = INITIAL_CAPITAL + self.trades['cumulative_pnl']
-        self.trades['cumulative_peak'] = self.trades['cumulative_pnl'].cummax()
-        self.trades['drawdown'] = self.trades['cumulative_peak'] - self.trades['cumulative_pnl']
-        self.trades['drawdown_pct'] = (self.trades['drawdown'] / (INITIAL_CAPITAL + self.trades['cumulative_peak'])) * 100
+        # Performance metrics
+        df['pnl'] = pd.to_numeric(df['pnl'], errors='coerce').fillna(0)
+        df['win'] = (df['pnl'] > 0).astype(int)
+        df['cumulative_pnl'] = df['pnl'].cumsum()
+        df['equity'] = INITIAL_CAPITAL + df['cumulative_pnl']
+        df['cumulative_peak'] = df['cumulative_pnl'].cummax()
+        df['drawdown'] = df['cumulative_peak'] - df['cumulative_pnl']
+        df['drawdown'] = df['drawdown'].clip(lower=0) # Ensure non-negative
         
-        # Win/Loss flags
-        self.trades['win'] = (self.trades['pnl'] > 0).astype(int)
+        # Rolling metrics (30 trades)
+        df['rolling_winrate'] = df['win'].rolling(30, min_periods=1).mean() * 100
+        df['rolling_pnl'] = df['pnl'].rolling(30, min_periods=1).sum()
         
         # Streak Calculation
-        self.calculate_streaks()
+        df['streak_id'] = (df['win'] != df['win'].shift()).cumsum()
+        df['streak_count'] = df.groupby('streak_id').cumcount() + 1
+        df['streak_val'] = np.where(df['win'] == 1, df['streak_count'], -df['streak_count'])
         
-    def calculate_streaks(self):
-        """Calculate win/loss streaks"""
-        # Create groups of consecutive wins/losses
-        self.trades['streak_id'] = (self.trades['win'] != self.trades['win'].shift()).cumsum()
-        self.trades['streak_count'] = self.trades.groupby('streak_id').cumcount() + 1
+        # Trade sequence
+        df['trade_num'] = range(1, len(df) + 1)
         
-        # Positive for wins, negative for losses
-        self.trades['streak_val'] = np.where(self.trades['win'] == 1, 
-                                           self.trades['streak_count'], 
-                                           -self.trades['streak_count'])
+        self.trades = df
+        
+    # Alias for backward compatibility if needed
+    def prepare_data(self):
+        self.enrich_data()
 
     def calculate_sharpe(self, returns, risk_free=0.0):
         if len(returns) < 2: return 0.0
@@ -203,104 +239,214 @@ class TradingStrategyAnalyzer:
         print("  - results/charts/ (Visualization files)")
         
     def executive_summary(self):
-        """Generate executive summary"""
-        try:
-            # Calculate key metrics
-            total_trades = len(self.trades)
-            win_rate = (self.trades['pnl'] > 0).mean() * 100
-            total_pnl = self.trades['pnl'].sum()
-            avg_pnl = self.trades['pnl'].mean()
+        """Generate 1-page executive summary with key metrics."""
+        print("\n" + "="*80)
+        print("EXECUTIVE SUMMARY - 2 YEAR BACKTEST ANALYSIS")
+        print("="*80)
+        
+        df = self.trades
+        
+        # Overall performance
+        total_trades = len(df)
+        wins = df['win'].sum()
+        losses = total_trades - wins
+        win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+        
+        total_pnl = df['pnl'].sum()
+        avg_win = df[df['pnl'] > 0]['pnl'].mean()
+        avg_loss = df[df['pnl'] < 0]['pnl'].mean()
+        
+        # Risk metrics
+        max_dd = df['drawdown'].max()
+        max_dd_pct = (df['drawdown'] / df['cumulative_peak']).max() * 100 if df['cumulative_peak'].max() > 0 else 0
+        
+        # Calculate Sharpe ratio (daily)
+        daily_returns = df.groupby(df['timestamp'].dt.date)['pnl'].sum()
+        sharpe = (daily_returns.mean() / daily_returns.std() * np.sqrt(365)) if daily_returns.std() > 0 else 0
+        
+        # Time period
+        start_date = df['timestamp'].min()
+        end_date = df['timestamp'].max()
+        days = (end_date - start_date).days
+        
+        print(f"\nPERFORMANCE OVERVIEW")
+        print(f"  Period: {start_date.date()} to {end_date.date()} ({days} days)")
+        print(f"  Total Trades: {total_trades:,}")
+        print(f"  Wins: {wins} | Losses: {losses}")
+        print(f"  Win Rate: {win_rate:.2f}%")
+        print(f"  Total PnL: ${total_pnl:.2f}")
+        print(f"  Avg Win: ${avg_win:.3f} | Avg Loss: ${avg_loss:.3f}")
+        if avg_loss != 0: # Safe division
+             print(f"  Profit Factor: {abs(avg_win / avg_loss):.2f}")
+        
+        print(f"\nRISK METRICS")
+        print(f"  Max Drawdown: ${max_dd:.2f} ({max_dd_pct:.2f}%)")
+        print(f"  Sharpe Ratio: {sharpe:.2f}")
+        
+        # Recent performance degradation check
+        recent_count = int(total_trades * 0.05)
+        if recent_count > 0:
+            recent_10d = df.tail(recent_count)  # Last 5% of trades
+            recent_wr = (recent_10d['win'].mean() * 100)
+            recent_pnl = recent_10d['pnl'].sum()
             
-            # Duration (Days)
-            duration_days = (self.trades['timestamp'].max() - self.trades['timestamp'].min()).days
-            if duration_days < 1: duration_days = 1
-            years = duration_days / 365.25
+            print(f"\nRECENT PERFORMANCE (Last {len(recent_10d)} trades)")
+            print(f"  Win Rate: {recent_wr:.2f}%")
+            print(f"  PnL: ${recent_pnl:.2f}")
             
-            # CAGR
-            final_equity = INITIAL_CAPITAL + total_pnl
-            cagr = ((final_equity / INITIAL_CAPITAL) ** (1/years) - 1) * 100 if years > 0 and final_equity > 0 else 0
+            if recent_wr < win_rate - 5:
+                print(f"\n⚠️ WARNING: Recent performance DOWN {win_rate - recent_wr:.1f}% from overall!")
+                print("  → Investigate recent market regime changes")
+                print("  → Consider parameter adjustment or temporary pause")
+        else:
+            recent_wr = win_rate
             
-            # Max Drawdown
-            max_dd = self.trades['drawdown'].max()
-            max_dd_pct = (self.trades['drawdown'] / (INITIAL_CAPITAL + self.trades['cumulative_peak'])).max() * 100
-            
-            # Sharpe (Trade-based)
-            # Simple approximation: Mean / Std of trade returns * sqrt(trades_per_year)
-            trades_per_year = total_trades / years if years > 0 else total_trades
-            std_pnl = self.trades['pnl'].std()
-            sharpe = (avg_pnl / std_pnl * np.sqrt(trades_per_year)) if std_pnl > 0 else 0
-            
-            # Profit Factor
-            gross_profit = self.trades[self.trades['pnl'] > 0]['pnl'].sum()
-            gross_loss = abs(self.trades[self.trades['pnl'] < 0]['pnl'].sum())
-            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
-            
-            summary = f"""
-EXECUTIVE SUMMARY
-=================
-Analysis Period: {self.trades['timestamp'].min().date()} to {self.trades['timestamp'].max().date()}
-Duration: {duration_days} days ({years:.2f} years)
-
-PERFORMANCE METRICS
--------------------
-Total Trades:       {total_trades}
-Win Rate:           {win_rate:.2f}%
-Total PnL:         ${total_pnl:.2f}
-Final Equity:      ${final_equity:.2f} (Start: ${INITIAL_CAPITAL})
-CAGR:               {cagr:.2f}%
-Sharpe Ratio:       {sharpe:.2f}
-Profit Factor:      {profit_factor:.2f}
-Expectancy:        ${avg_pnl:.2f} per trade
-
-RISK METRICS
-------------
-Max Drawdown:      ${max_dd:.2f}
-Max Drawdown %:     {max_dd_pct:.2f}%
-Worst Trade:       ${self.trades['pnl'].min():.2f}
-Best Trade:        ${self.trades['pnl'].max():.2f}
-            """
-            
-            with open('results/executive_summary.txt', 'w') as f:
-                f.write(summary)
-            print(summary)
-        except Exception as e:
-            print(f"Error in Executive Summary: {e}")
+        # Save to file
+        with open(f"{self.results_dir}/executive_summary.txt", 'w') as f:
+            f.write("="*80 + "\n")
+            f.write("EXECUTIVE SUMMARY\n")
+            f.write("="*80 + "\n\n")
+            f.write(f"Win Rate: {win_rate:.2f}%\n")
+            f.write(f"Total PnL: ${total_pnl:.2f}\n")
+            f.write(f"Sharpe Ratio: {sharpe:.2f}\n")
+            f.write(f"Max Drawdown: ${max_dd:.2f}\n")
+            f.write(f"Recent Win Rate: {recent_wr:.2f}%\n")
+        
+        print(f"\n✅ Saved: {self.results_dir}/executive_summary.txt")
 
     def temporal_analysis(self):
-        """Temporal Analysis (Heatmaps & Equity Curve)"""
+        """Deep dive into time-based performance patterns."""
+        print("\n" + "="*80)
+        print("TEMPORAL PERFORMANCE ANALYSIS")
+        print("="*80)
+        
+        df = self.trades
+        
+        # === HOURLY ANALYSIS ===
+        print("\n### HOURLY BREAKDOWN (0-23 UTC) ###")
+        hourly = df.groupby('hour').agg({
+            'pnl': ['sum', 'mean', 'count'],
+            'win': 'mean'
+        })
+        hourly.columns = ['Total_PnL', 'Avg_PnL', 'Trades', 'Win_Rate']
+        hourly['Win_Rate'] = hourly['Win_Rate'] * 100
+        hourly = hourly.round(2)
+        
+        # Sort by total PnL
+        hourly_sorted = hourly.sort_values('Total_PnL', ascending=False)
+        best_3_hours = hourly_sorted.head(3)
+        worst_3_hours = hourly_sorted.tail(3)
+        
+        print(f"\n🎯 TOP 3 BEST HOURS:")
+        for idx, row in best_3_hours.iterrows():
+            print(f"   Hour {idx:02d}: ${row['Total_PnL']:.2f} PnL, "
+                  f"{row['Win_Rate']:.1f}% WR, {int(row['Trades'])} trades")
+        
+        print(f"\n❌ TOP 3 WORST HOURS:")
+        for idx, row in worst_3_hours.iterrows():
+            print(f"   Hour {idx:02d}: ${row['Total_PnL']:.2f} PnL, "
+                  f"{row['Win_Rate']:.1f}% WR, {int(row['Trades'])} trades")
+        
+        potential_gain = abs(worst_3_hours[worst_3_hours['Total_PnL'] < 0]['Total_PnL'].sum())
+        print(f"\n💡 RECOMMENDATION: Avoid hours {worst_3_hours.index.tolist()}")
+        print(f"   This would save ${potential_gain:.2f} in losses")
+        
+        # === DAY OF WEEK ANALYSIS ===
+        print("\n### DAY OF WEEK BREAKDOWN ###")
+        dow_agg = df.groupby('day_name').agg({
+            'pnl': ['sum', 'mean'],
+            'win': 'mean',
+            'trade_num': 'count'
+        })
+        dow_agg.columns = ['Total_PnL', 'Avg_PnL', 'Win_Rate', 'Trades']
+        dow_agg['Win_Rate'] = dow_agg['Win_Rate'] * 100
+        # Reindex for proper ordering
+        days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        dow_agg = dow_agg.reindex(days_order).dropna()
+        dow_agg = dow_agg.round(2)
+        
+        print(dow_agg.to_string())
+        
+        best_day = dow_agg['Total_PnL'].idxmax()
+        worst_day = dow_agg['Total_PnL'].idxmin()
+        print(f"\n   Best day: {best_day} (${dow_agg.loc[best_day, 'Total_PnL']:.2f})")
+        print(f"   Worst day: {worst_day} (${dow_agg.loc[worst_day, 'Total_PnL']:.2f})")
+        
+        # === MONTHLY TRENDS ===
+        print("\n### MONTHLY PERFORMANCE ###")
+        monthly = df.groupby('month_name').agg({
+            'pnl': ['sum', 'mean'],
+            'win': 'mean',
+            'trade_num': 'count'
+        })
+        monthly.columns = ['Total_PnL', 'Avg_PnL', 'Win_Rate', 'Trades']
+        monthly['Win_Rate'] = monthly['Win_Rate'] * 100
+        monthly = monthly.round(2)
+        
+        print(monthly.to_string())
+        
+        # Performance degradation check
+        if len(monthly) > 6:
+            first_6m = monthly.head(6)['Win_Rate'].mean()
+            last_6m = monthly.tail(6)['Win_Rate'].mean()
+            
+            print(f"\n📊 TREND ANALYSIS:")
+            print(f"   First 6 months avg WR: {first_6m:.2f}%")
+            print(f"   Last 6 months avg WR: {last_6m:.2f}%")
+            print(f"   Change: {last_6m - first_6m:+.2f}%")
+            
+            if last_6m < first_6m - 3:
+                print(f"\n⚠️ ALERT: Performance degrading over time!")
+                print("   Possible causes:")
+                print("   1. Market regime changed (trending → ranging or vice versa)")
+                print("   2. Optimal parameters shifted")
+                print("   → Consider reoptimization")
+        
+        # Save detailed report
+        with open(f"{self.results_dir}/temporal_analysis.txt", 'w') as f:
+            f.write("TEMPORAL PERFORMANCE ANALYSIS\n")
+            f.write("="*80 + "\n\n")
+            f.write(hourly.to_string() + "\n\n")
+            f.write(dow_agg.to_string() + "\n\n")
+            f.write(monthly.to_string())
+
+        # Generate Visualizations
+        self.plot_temporal_heatmaps(df)
+
+    def plot_temporal_heatmaps(self, df):
+        """Generate charts for temporal analysis"""
         try:
             # 1. Monthly Heatmap
-            monthly_pnl = self.trades.groupby(['year', 'month'])['pnl'].sum().reset_index()
+            monthly_pnl = df.groupby(['year', 'month'])['pnl'].sum().reset_index()
             monthly_pivot = monthly_pnl.pivot(index='year', columns='month', values='pnl')
             
             plt.figure(figsize=(12, 6))
             sns.heatmap(monthly_pivot, annot=True, fmt=".2f", cmap='RdYlGn', center=0)
             plt.title('Monthly PnL Heatmap')
-            plt.savefig('results/charts/monthly_performance_heatmap.png')
+            plt.savefig(f'{self.charts_dir}/monthly_performance_heatmap.png')
             plt.close()
             
             # 2. Hourly Heatmap
-            hourly_perf = self.trades.groupby('hour')['pnl'].mean()
+            hourly_perf = df.groupby('hour')['pnl'].mean()
             plt.figure(figsize=(10, 5))
             hourly_perf.plot(kind='bar', color='skyblue')
             plt.title('Average PnL by Hour (UTC)')
             plt.ylabel('Avg PnL')
-            plt.savefig('results/charts/hourly_performance.png')
+            plt.savefig(f'{self.charts_dir}/hourly_performance.png')
             plt.close()
             
             # 3. Equity Curve
             plt.figure(figsize=(12, 6))
-            plt.plot(self.trades['timestamp'], self.trades['equity'], label='Equity')
+            plt.plot(df['timestamp'], df['equity'], label='Equity')
             plt.title('Strategy Equity Curve')
             plt.xlabel('Date')
             plt.ylabel('Capital ($)')
-            plt.fill_between(self.trades['timestamp'], self.trades['equity'], INITIAL_CAPITAL, alpha=0.1)
+            plt.fill_between(df['timestamp'], df['equity'], INITIAL_CAPITAL, alpha=0.1)
             plt.legend()
-            plt.savefig('results/charts/equity_curve_detailed.png')
+            plt.savefig(f'{self.charts_dir}/equity_curve_detailed.png')
             plt.close()
-            
         except Exception as e:
-            print(f"Error in Temporal Analysis: {e}")
+            print(f"Error plotting temporal charts: {e}")
 
     def signal_quality_analysis(self):
         """Analyze Signal Quality"""
@@ -314,7 +460,7 @@ Best Trade:        ${self.trades['pnl'].max():.2f}
             report.append(type_perf.to_string())
             
             # Save Report
-            with open('results/signal_quality_report.txt', 'w') as f:
+            with open(f"{self.results_dir}/signal_quality_report.txt", 'w') as f:
                 f.write('\n'.join(report))
                 
         except Exception as e:
@@ -327,15 +473,52 @@ Best Trade:        ${self.trades['pnl'].max():.2f}
             plt.figure(figsize=(10, 6))
             sns.histplot(self.trades['pnl'], kde=True, bins=30)
             plt.title('PnL Distribution')
-            plt.savefig('results/charts/pnl_distribution.png')
+            plt.savefig(f'{self.charts_dir}/pnl_distribution.png')
             plt.close()
             
         except Exception as e:
-            print(f"Error in Trade Outcome Analysis: {e}")
+             print(f"Error in Trade Outcome Analysis: {e}")
 
     def performance_attribution(self):
-        """Attribution Analysis"""
-        pass # To be implemented
+        """Attribution Analysis by Signal and Streak"""
+        print("\n" + "="*80)
+        print("PERFORMANCE ATTRIBUTION")
+        print("="*80)
+        
+        df = self.trades
+        
+        # 1. By Signal Type
+        print("\n### BY SIGNAL TYPE ###")
+        sig_perf = df.groupby('signal')['pnl'].agg(['count', 'sum', 'mean', lambda x: (x>0).mean()*100])
+        sig_perf.columns = ['Trades', 'Total PnL', 'Avg PnL', 'Win Rate %']
+        print(sig_perf)
+        
+        # 2. By Streak Context (After Win vs After Loss)
+        print("\n### BY STREAK CONTEXT ###")
+        # Shift win to see previous outcome
+        df['prev_win'] = df['win'].shift()
+        streak_perf = df.groupby('prev_win')['pnl'].agg(['count', 'sum', 'mean', lambda x: (x>0).mean()*100])
+        streak_perf.index = ['After Loss', 'After Win']
+        streak_perf.columns = ['Trades', 'Total PnL', 'Avg PnL', 'Win Rate %']
+        print(streak_perf)
+        
+        # 3. By Volatility (if ATR available)
+        if 'atr' in df.columns and 'close' in df.columns:
+            df['atr_pct'] = (df['atr'] / df['close']) * 100
+            df['vol_bin'] = pd.qcut(df['atr_pct'], q=5, labels=['Very Low', 'Low', 'Med', 'High', 'Very High'])
+            
+            print("\n### BY VOLATILITY REGIME (ATR %) ###")
+            vol_perf = df.groupby('vol_bin')['pnl'].agg(['count', 'sum', 'mean', lambda x: (x>0).mean()*100])
+            vol_perf.columns = ['Trades', 'Total PnL', 'Avg PnL', 'Win Rate %']
+            print(vol_perf)
+            
+        # 4. By RSI Bin (if available)
+        if 'rsi' in df.columns:
+            df['rsi_bin'] = pd.cut(df['rsi'], bins=[0, 30, 40, 50, 60, 70, 100], labels=['<30', '30-40', '40-50', '50-60', '60-70', '>70'])
+            print("\n### BY RSI ZONE ###")
+            rsi_perf = df.groupby('rsi_bin')['pnl'].agg(['count', 'sum', 'mean', lambda x: (x>0).mean()*100])
+            rsi_perf.columns = ['Trades', 'Total PnL', 'Avg PnL', 'Win Rate %']
+            print(rsi_perf)
 
     def risk_analysis(self):
         """Risk Checks"""
@@ -689,9 +872,9 @@ def run_2year_backtest(start_date=START_DATE, end_date=END_DATE):
            
            ret = (exit_price - entry_price) / entry_price
            
-           # PnL (Fixed $10 bet)
+           # PnL (Fixed Risk)
            # Win if Price > Entry
-           pnl = 10 if exit_price > entry_price else -10
+           pnl = RISK_PER_TRADE if exit_price > entry_price else -RISK_PER_TRADE
            outcome = "WIN" if pnl > 0 else "LOSS"
            
            trades.append({
@@ -702,7 +885,10 @@ def run_2year_backtest(start_date=START_DATE, end_date=END_DATE):
                'exit_price': exit_price,
                'outcome': outcome,
                'pnl': pnl,
-               'reason': 'Vectorized Signal'
+               'reason': 'Vectorized Signal',
+               'rsi': rsi.iloc[idx],
+               'atr': atr.iloc[idx],
+               'close': entry_price
            })
         except: continue
 
@@ -719,7 +905,7 @@ def run_2year_backtest(start_date=START_DATE, end_date=END_DATE):
            exit_time = df.index[idx+1]
            
            # Win if Price < Entry
-           pnl = 10 if exit_price < entry_price else -10
+           pnl = RISK_PER_TRADE if exit_price < entry_price else -RISK_PER_TRADE
            outcome = "WIN" if pnl > 0 else "LOSS"
            
            trades.append({
@@ -730,7 +916,10 @@ def run_2year_backtest(start_date=START_DATE, end_date=END_DATE):
                'exit_price': exit_price,
                'outcome': outcome,
                'pnl': pnl,
-               'reason': 'Vectorized Signal'
+               'reason': 'Vectorized Signal',
+               'rsi': rsi.iloc[idx],
+               'atr': atr.iloc[idx],
+               'close': entry_price
            })
         except: continue
         
