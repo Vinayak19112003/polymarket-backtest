@@ -1,11 +1,9 @@
-
 # Python
 __pycache__/
 *.pyc
 *.pyo
 venv/
 .env
-data/
 output/
 trading_bot.db
 bot_state.json
@@ -15,6 +13,18 @@ bot_state.json
 models/
 demo/
 unwanted_files/
+
+# Deployment
+releases/
+*.zip
+
+# Logs
+logs/
+*.log
+
+# Large Data
+*snapshots.csv
+data/
 demo_trades_real_polymarket.csv
 demo_equity_real_polymarket.csv
 
