@@ -9,8 +9,8 @@ from datetime import datetime, timezone, timedelta
 SYMBOL = "BTCUSDT"
 INTERVAL = "1m"
 
-# Past 30 Days from Feb 6, 2026
-END_TIME = datetime(2026, 2, 6, 23, 59, 59, tzinfo=timezone.utc)
+# Past 30 Days from Mar 25, 2026
+END_TIME = datetime(2026, 3, 25, 23, 59, 59, tzinfo=timezone.utc)
 START_TIME = END_TIME - timedelta(days=32) # Fetch 32 days to ensure indicator warmup
 
 ENTRY_PRICE = 0.50
